@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}WM-FORECAST · Dashboard{% endblock %}
+
+{% block content %}
+<span class="eyebrow">02 · Dashboard</span>
+<h1 style="font-size:32px;">Portfolio overview</h1>
+<p>Aggregate demand across all 45 stores, plus how well the model tracked actual sales on the held-out test weeks.</p>
+
+<div class="grid grid-3" style="margin: 28px 0;">
+  <div class="panel stat">
+    <div class="stat-label">Total historical revenue</div>
+    <div class="stat-value" id="stat-total-rev">—</div>
+    <div class="stat-sub" id="stat-total-rev-sub">across all stores &amp; weeks</div>
+  </div>
+  <div class="panel stat">
+    <div class="stat-label">Avg weekly sales / store</div>
+    <div class="stat-value" id="stat-avg-store">—</div>
+    <div class="stat-sub">mean of 45 store averages</div>
+  </div>
+  <div class="panel stat">
+    <div class="stat-label">Holiday week lift</div>
+    <div class="stat-value" id="stat-holiday-lift">—</div>
+    <div class="stat-sub">avg sales, holiday vs non-holiday week</div>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <div class="panel section">
+    <h3>Total weekly sales — all stores</h3>
+    <canvas id="chart-total-trend" height="220"></canvas>
+  </div>
+  <div class="panel section">
+    <h3>Top 10 stores by avg weekly sales</h3>
+    <canvas id="chart-top-stores" height="220"></canvas>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <div class="panel section">
+    <h3>Model comparison — WAPE (lower is better)</h3>
+    <canvas id="chart-model-compare" height="220"></canvas>
+  </div>
+  <div class="panel section">
+    <h3>Feature importance — {{ '' }}<span id="fi-model-name" class="mono" style="color:var(--amber);"></span></h3>
+    <canvas id="chart-feature-importance" height="220"></canvas>
+  </div>
+</div>
+
+<div class="panel section">
+  <h3>Actual vs. predicted — held-out test weeks (all stores summed)</h3>
+  <canvas id="chart-avp" height="140"></canvas>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+<script>
+const CHART_COLORS = {
+  amber: "#F5A623",
+  teal: "#3ED6B5",
+  red: "#FF6B5C",
+  grid: "#2A3340",
+  text: "#8B94A6",
+};
+Chart.defaults.color = CHART_COLORS.text;
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size = 11;
+Chart.defaults.borderColor = CHART_COLORS.grid;
+
+async function loadDashboard() {
+  const [storesRes, avpRes, metricsRes, fiRes, holidayRes] = await Promise.all([
+    fetch("/api/stores"),
+    fetch("/api/actual-vs-predicted"),
+    fetch("/api/model-metrics"),
+    fetch("/api/feature-importance"),
+    fetch("/api/holiday-effect"),
+  ]);
+  const stores = await storesRes.json();
+  const avp = await avpRes.json();
+  const metrics = await metricsRes.json();
+  const fi = await fiRes.json();
+  const holiday = await holidayRes.json();
+
+  // ---- stat cards ----
+  const totalRev = stores.reduce((s, x) => s + x.avg_weekly_sales * x.n_weeks, 0);
+  const avgStore = stores.reduce((s, x) => s + x.avg_weekly_sales, 0) / stores.length;
+  document.getElementById("stat-total-rev").textContent = fmtCurrency(totalRev);
+  document.getElementById("stat-avg-store").textContent = fmtCurrency(avgStore);
+
+  // ---- total trend (from actual-vs-predicted, use 'actual' series) ----
+  new Chart(document.getElementById("chart-total-trend"), {
+    type: "line",
+    data: {
+      labels: avp.map(r => r.Date),
+      datasets: [{
+        label: "Actual weekly sales",
+        data: avp.map(r => r.actual),
+        borderColor: CHART_COLORS.amber,
+        backgroundColor: "rgba(245,166,35,0.08)",
+        fill: true,
+        tension: 0.25,
+        pointRadius: 0,
+      }],
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8 } },
+        y: { ticks: { callback: v => "$" + (v/1e6).toFixed(1) + "M" } },
+      },
+    },
+  });
+
+  // ---- top 10 stores ----
+  const topStores = [...stores].sort((a,b) => b.avg_weekly_sales - a.avg_weekly_sales).slice(0, 10);
+  new Chart(document.getElementById("chart-top-stores"), {
+    type: "bar",
+    data: {
+      labels: topStores.map(s => "Store " + s.store),
+      datasets: [{
+        label: "Avg weekly sales",
+        data: topStores.map(s => s.avg_weekly_sales),
+        backgroundColor: CHART_COLORS.teal,
+        borderRadius: 2,
+      }],
+    },
+    options: {
+      indexAxis: "y",
+      plugins: { legend: { display: false } },
+      scales: { x: { ticks: { callback: v => "$" + (v/1e6).toFixed(1) + "M" } } },
+    },
+  });
+
+  // ---- model comparison ----
+  new Chart(document.getElementById("chart-model-compare"), {
+    type: "bar",
+    data: {
+      labels: metrics.comparison.map(r => r.Model),
+      datasets: [{
+        label: "WAPE (%)",
+        data: metrics.comparison.map(r => r["WAPE (%)"]),
+        backgroundColor: metrics.comparison.map(r => r.Model === metrics.metadata.best_model_name ? CHART_COLORS.teal : CHART_COLORS.amber),
+        borderRadius: 2,
+      }],
+    },
+    options: { plugins: { legend: { display: false } } },
+  });
+
+  // ---- feature importance ----
+  document.getElementById("fi-model-name").textContent = metrics.metadata.best_model_name;
+  const fiSorted = [...fi].sort((a,b) => b.importance - a.importance).slice(0, 10);
+  new Chart(document.getElementById("chart-feature-importance"), {
+    type: "bar",
+    data: {
+      labels: fiSorted.map(r => r.feature),
+      datasets: [{
+        data: fiSorted.map(r => r.importance),
+        backgroundColor: CHART_COLORS.amber,
+        borderRadius: 2,
+      }],
+    },
+    options: {
+      indexAxis: "y",
+      plugins: { legend: { display: false } },
+      scales: { x: { ticks: { callback: v => (v*100).toFixed(0) + "%" } } },
+    },
+  });
+
+  // ---- actual vs predicted (test period only) ----
+  new Chart(document.getElementById("chart-avp"), {
+    type: "line",
+    data: {
+      labels: avp.map(r => r.Date),
+      datasets: [
+        {
+          label: "Actual",
+          data: avp.map(r => r.actual),
+          borderColor: CHART_COLORS.amber,
+          pointRadius: 0,
+          tension: 0.2,
+        },
+        {
+          label: "Predicted",
+          data: avp.map(r => r.predicted),
+          borderColor: CHART_COLORS.teal,
+          borderDash: [5,4],
+          pointRadius: 0,
+          tension: 0.2,
+        },
+      ],
+    },
+    options: {
+      scales: {
+        x: { ticks: { maxTicksLimit: 10 } },
+        y: { ticks: { callback: v => "$" + (v/1e6).toFixed(1) + "M" } },
+      },
+    },
+  });
+
+  document.getElementById("stat-holiday-lift").textContent = (holiday.lift_pct >= 0 ? "+" : "") + holiday.lift_pct + "%";
+  document.getElementById("stat-total-rev-sub").textContent = `${stores.length} stores`;
+}
+
+loadDashboard().catch(err => {
+  console.error(err);
+});
+</script>
+{% endblock %}

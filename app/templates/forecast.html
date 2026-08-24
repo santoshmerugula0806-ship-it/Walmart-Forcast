@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}WM-FORECAST · Forecast{% endblock %}
+
+{% block content %}
+<span class="eyebrow">04 · Forecast</span>
+<h1 style="font-size:32px;">Run a forward forecast</h1>
+<p>Pick a store and a horizon. The model recursively forecasts week by week — each predicted week feeds the lag/rolling-average features for the next. Exogenous conditions (temperature, fuel price, CPI, unemployment, holiday) default to the store's most recent known values; override any of them for a what-if scenario.</p>
+
+<div class="grid" style="grid-template-columns: 340px 1fr; gap:24px; margin-top:24px; align-items:start;">
+
+  <div class="panel">
+    <h3>Inputs</h3>
+    <div class="field">
+      <label for="fc-store">Store</label>
+      <select id="fc-store"></select>
+    </div>
+    <div class="field">
+      <label for="fc-weeks">Forecast horizon: <span id="fc-weeks-val">4</span> weeks</label>
+      <input type="range" id="fc-weeks" min="1" max="26" value="4">
+    </div>
+
+    <div class="divider" style="margin:20px 0;"></div>
+    <h3>Scenario overrides <span class="mono" style="color:var(--text-faint); text-transform:none;">(optional)</span></h3>
+
+    <div class="field">
+      <label for="fc-holiday">Holiday flag next weeks</label>
+      <select id="fc-holiday">
+        <option value="">Carry forward last known</option>
+        <option value="1">Force holiday week</option>
+        <option value="0">Force non-holiday week</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="fc-temp">Temperature (°F)</label>
+      <input type="number" id="fc-temp" placeholder="carry forward">
+    </div>
+    <div class="field">
+      <label for="fc-fuel">Fuel price ($)</label>
+      <input type="number" step="0.01" id="fc-fuel" placeholder="carry forward">
+    </div>
+    <div class="field">
+      <label for="fc-cpi">CPI</label>
+      <input type="number" step="0.01" id="fc-cpi" placeholder="carry forward">
+    </div>
+    <div class="field">
+      <label for="fc-unemp">Unemployment (%)</label>
+      <input type="number" step="0.01" id="fc-unemp" placeholder="carry forward">
+    </div>
+
+    <button class="btn" id="fc-run" style="width:100%; margin-top:8px;">Generate forecast</button>
+  </div>
+
+  <div>
+    <div class="grid grid-3" style="margin-bottom:20px;">
+      <div class="panel stat">
+        <div class="stat-label">Last known week</div>
+        <div class="stat-value" id="fc-last-date" style="font-size:18px;">—</div>
+        <div class="stat-sub" id="fc-last-sales">—</div>
+      </div>
+      <div class="panel stat">
+        <div class="stat-label">Forecast total</div>
+        <div class="stat-value" id="fc-total">—</div>
+        <div class="stat-sub" id="fc-total-sub">sum across horizon</div>
+      </div>
+      <div class="panel stat">
+        <div class="stat-label">Avg weekly forecast</div>
+        <div class="stat-value" id="fc-avg">—</div>
+      </div>
+    </div>
+
+    <div class="panel section">
+      <h3>Forecast trajectory</h3>
+      <canvas id="chart-forecast" height="220"></canvas>
+    </div>
+
+    <div class="panel section">
+      <h3>Week-by-week</h3>
+      <div id="fc-table-wrap"><div class="loading">Run a forecast to see results.</div></div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+<script>
+const CHART_COLORS = { amber: "#F5A623", teal: "#3ED6B5", grid: "#2A3340", text: "#8B94A6" };
+Chart.defaults.color = CHART_COLORS.text;
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size = 11;
+Chart.defaults.borderColor = CHART_COLORS.grid;
+
+let fcChart;
+
+async function initForecastPage() {
+  const res = await fetch("/api/stores");
+  const stores = await res.json();
+  const select = document.getElementById("fc-store");
+  select.innerHTML = stores.map(s => `<option value="${s.store}">Store ${s.store}</option>`).join("");
+
+  document.getElementById("fc-weeks").addEventListener("input", (e) => {
+    document.getElementById("fc-weeks-val").textContent = e.target.value;
+  });
+
+  document.getElementById("fc-run").addEventListener("click", runForecast);
+
+  runForecast();
+}
+
+async function runForecast() {
+  const store = Number(document.getElementById("fc-store").value);
+  const weeks = Number(document.getElementById("fc-weeks").value);
+
+  const body = { store, weeks };
+  const holiday = document.getElementById("fc-holiday").value;
+  const temp = document.getElementById("fc-temp").value;
+  const fuel = document.getElementById("fc-fuel").value;
+  const cpi = document.getElementById("fc-cpi").value;
+  const unemp = document.getElementById("fc-unemp").value;
+  if (holiday !== "") body.Holiday_Flag = holiday;
+  if (temp !== "") body.Temperature = temp;
+  if (fuel !== "") body.Fuel_Price = fuel;
+  if (cpi !== "") body.CPI = cpi;
+  if (unemp !== "") body.Unemployment = unemp;
+
+  const btn = document.getElementById("fc-run");
+  btn.disabled = true;
+  btn.textContent = "Running…";
+
+  try {
+    const res = await fetch("/api/forecast", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error("forecast request failed");
+    const data = await res.json();
+    renderForecast(data);
+  } catch (e) {
+    document.getElementById("fc-table-wrap").innerHTML = `<div class="error-box">Could not generate a forecast. ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Generate forecast";
+  }
+}
+
+function renderForecast(data) {
+  document.getElementById("fc-last-date").textContent = data.last_known_date;
+  document.getElementById("fc-last-sales").textContent = fmtCurrency(data.last_known_sales) + " actual";
+
+  const total = data.forecast.reduce((s, r) => s + r.predicted_sales, 0);
+  const avg = total / data.forecast.length;
+  document.getElementById("fc-total").textContent = fmtCurrency(total);
+  document.getElementById("fc-total-sub").textContent = `over ${data.forecast.length} weeks`;
+  document.getElementById("fc-avg").textContent = fmtCurrency(avg);
+
+  const labels = [data.last_known_date, ...data.forecast.map(r => r.date)];
+  const values = [data.last_known_sales, ...data.forecast.map(r => r.predicted_sales)];
+
+  if (fcChart) fcChart.destroy();
+  fcChart = new Chart(document.getElementById("chart-forecast"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Sales (actual → forecast)",
+        data: values,
+        borderColor: CHART_COLORS.teal,
+        backgroundColor: "rgba(62,214,181,0.08)",
+        fill: true,
+        segment: {
+          borderColor: ctx => ctx.p0DataIndex === 0 ? CHART_COLORS.amber : CHART_COLORS.teal,
+          borderDash: ctx => ctx.p0DataIndex === 0 ? [] : [5,4],
+        },
+        pointRadius: 3,
+        pointBackgroundColor: (ctx) => ctx.dataIndex === 0 ? CHART_COLORS.amber : CHART_COLORS.teal,
+        tension: 0.2,
+      }],
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { y: { ticks: { callback: v => "$" + (v/1e6).toFixed(2) + "M" } } },
+    },
+  });
+
+  let rows = data.forecast.map(r => `<tr><td>${r.date}</td><td>${fmtCurrency(r.predicted_sales)}</td></tr>`).join("");
+  document.getElementById("fc-table-wrap").innerHTML = `
+    <table>
+      <thead><tr><th>Week of</th><th>Predicted sales</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+initForecastPage();
+</script>
+{% endblock %}

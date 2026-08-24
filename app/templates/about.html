@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}WM-FORECAST · Model{% endblock %}
+
+{% block content %}
+<span class="eyebrow">06 · Model</span>
+<h1 style="font-size:32px;">How the forecast is built</h1>
+
+<div class="grid grid-2" style="margin-top: 28px;">
+  <div class="panel">
+    <h3>Data</h3>
+    <p style="color:var(--text);">Walmart Store Sales (Kaggle, yasserh/walmart-dataset) — 6,435 weekly records across 45 stores, Feb 2010 to Dec 2012. Includes weekly sales, holiday flag, temperature, fuel price, CPI, and unemployment.</p>
+    <h3 style="margin-top:20px;">Feature engineering</h3>
+    <p style="color:var(--text);">Per store: sales lags at 1/4/8/12 weeks, rolling mean &amp; std over 4/8/12 weeks (computed on a 1-week-shifted window so a week's own sales never leak into its own average), plus month, week-of-year, and quarter.</p>
+    <h3 style="margin-top:20px;">Split</h3>
+    <p style="color:var(--text);">Time-based, never random — the model is always trained on the past and evaluated on the future. 80% train / 20% test by date.</p>
+  </div>
+
+  <div class="panel">
+    <h3>Models compared</h3>
+    <div id="about-metrics" class="loading">Loading…</div>
+    <p style="margin-top:14px; font-size:12.5px;">WAPE (Weighted Absolute Percentage Error) is the primary metric — standard for retail demand forecasting because it weights errors by sales volume rather than treating every week equally.</p>
+  </div>
+</div>
+
+<div class="panel section" style="margin-top:24px;">
+  <h3>Feature importance — full breakdown</h3>
+  <div id="about-fi-table"><div class="loading">Loading…</div></div>
+</div>
+
+<div class="panel section">
+  <h3>Known limitations</h3>
+  <ul style="color:var(--text-muted); line-height:1.8; padding-left:20px;">
+    <li>Forecasts beyond the historical data range are recursive — each predicted week feeds the next, so uncertainty compounds the further out you forecast. Treat horizons beyond ~8 weeks as directional, not precise.</li>
+    <li>Exogenous inputs (temperature, fuel price, CPI, unemployment) are carried forward from the last known value unless you override them on the Forecast page — the model has no way to know these in advance.</li>
+    <li>The model was trained on 2010–2012 data; store openings/closures, macro shocks, or structural changes in shopping behavior since then are not reflected.</li>
+    <li>Store-level accuracy varies — check the Store Log page for a given store's actual-vs-predicted fit before trusting its forecast closely.</li>
+  </ul>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function loadAbout() {
+  const [metricsRes, fiRes] = await Promise.all([
+    fetch("/api/model-metrics"),
+    fetch("/api/feature-importance"),
+  ]);
+  const metrics = await metricsRes.json();
+  const fi = await fiRes.json();
+
+  let mHtml = '<table><thead><tr><th>Model</th><th>MAE</th><th>RMSE</th><th>MAPE</th><th>WAPE</th></tr></thead><tbody>';
+  metrics.comparison.forEach(r => {
+    const isBest = r.Model === metrics.metadata.best_model_name;
+    mHtml += `<tr><td>${r.Model}${isBest ? ' <span class="tag tag-best">BEST</span>' : ''}</td><td>${fmtCurrency(r.MAE)}</td><td>${fmtCurrency(r.RMSE)}</td><td>${r["MAPE (%)"]}%</td><td>${r["WAPE (%)"]}%</td></tr>`;
+  });
+  mHtml += '</tbody></table>';
+  document.getElementById("about-metrics").outerHTML = `<div id="about-metrics">${mHtml}</div>`;
+
+  const fiSorted = [...fi].sort((a,b) => b.importance - a.importance);
+  let fHtml = '<table><thead><tr><th>Feature</th><th>Importance</th></tr></thead><tbody>';
+  fiSorted.forEach(r => {
+    fHtml += `<tr><td>${r.feature}</td><td>${(r.importance*100).toFixed(1)}%</td></tr>`;
+  });
+  fHtml += '</tbody></table>';
+  document.getElementById("about-fi-table").innerHTML = fHtml;
+}
+loadAbout();
+</script>
+{% endblock %}

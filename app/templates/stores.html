@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}WM-FORECAST · Store Log{% endblock %}
+
+{% block content %}
+<span class="eyebrow">03 · Store Log</span>
+<h1 style="font-size:32px;">Store-level record</h1>
+<p>Pick a store to see its full sales history and how closely the model tracked it on the held-out test weeks.</p>
+
+<div class="panel section" style="margin-top:24px;">
+  <div class="field-row" style="align-items:end;">
+    <div class="field" style="margin-bottom:0;">
+      <label for="store-select">Store</label>
+      <select id="store-select"></select>
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <div class="badge"><span class="dot"></span><span id="store-badge-text">select a store</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-3" style="margin: 20px 0;">
+  <div class="panel stat">
+    <div class="stat-label">Avg weekly sales</div>
+    <div class="stat-value" id="store-avg">—</div>
+  </div>
+  <div class="panel stat">
+    <div class="stat-label">Weeks of history</div>
+    <div class="stat-value" id="store-weeks">—</div>
+  </div>
+  <div class="panel stat">
+    <div class="stat-label">Latest recorded week</div>
+    <div class="stat-value" id="store-latest" style="font-size:20px;">—</div>
+  </div>
+</div>
+
+<div class="panel section">
+  <h3>Sales history</h3>
+  <canvas id="chart-history" height="200"></canvas>
+</div>
+
+<div class="panel section">
+  <h3>Actual vs. predicted — test weeks for this store</h3>
+  <canvas id="chart-store-avp" height="200"></canvas>
+  <p id="avp-note" style="margin-top:10px; font-size:12px;"></p>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+<script>
+const CHART_COLORS = { amber: "#F5A623", teal: "#3ED6B5", grid: "#2A3340", text: "#8B94A6" };
+Chart.defaults.color = CHART_COLORS.text;
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size = 11;
+Chart.defaults.borderColor = CHART_COLORS.grid;
+
+let historyChart, avpChart;
+let allStores = [];
+
+async function init() {
+  const res = await fetch("/api/stores");
+  allStores = await res.json();
+
+  const select = document.getElementById("store-select");
+  select.innerHTML = allStores.map(s => `<option value="${s.store}">Store ${s.store}</option>`).join("");
+  select.addEventListener("change", () => loadStore(Number(select.value)));
+
+  loadStore(allStores[0].store);
+}
+
+async function loadStore(storeId) {
+  const meta = allStores.find(s => s.store === storeId);
+  document.getElementById("store-badge-text").textContent = `store ${storeId} · active`;
+  document.getElementById("store-avg").textContent = fmtCurrency(meta.avg_weekly_sales);
+  document.getElementById("store-weeks").textContent = meta.n_weeks;
+  document.getElementById("store-latest").textContent = meta.latest_date;
+
+  const [histRes, avpRes] = await Promise.all([
+    fetch(`/api/stores/${storeId}/history`),
+    fetch(`/api/stores/${storeId}/actual-vs-predicted`),
+  ]);
+  const hist = await histRes.json();
+  const avp = avpRes.ok ? await avpRes.json() : null;
+
+  if (historyChart) historyChart.destroy();
+  historyChart = new Chart(document.getElementById("chart-history"), {
+    type: "line",
+    data: {
+      labels: hist.dates,
+      datasets: [{
+        label: "Weekly sales",
+        data: hist.actual_sales,
+        borderColor: CHART_COLORS.amber,
+        backgroundColor: "rgba(245,166,35,0.08)",
+        fill: true,
+        pointRadius: hist.dates.map((_, i) => hist.holiday_flag[i] ? 3 : 0),
+        pointBackgroundColor: CHART_COLORS.teal,
+        tension: 0.2,
+      }],
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8 } },
+        y: { ticks: { callback: v => "$" + (v/1e6).toFixed(2) + "M" } },
+      },
+    },
+  });
+
+  if (avpChart) avpChart.destroy();
+  const avpNote = document.getElementById("avp-note");
+  if (avp && avp.dates && avp.dates.length) {
+    avpNote.textContent = "";
+    avpChart = new Chart(document.getElementById("chart-store-avp"), {
+      type: "line",
+      data: {
+        labels: avp.dates,
+        datasets: [
+          { label: "Actual", data: avp.actual, borderColor: CHART_COLORS.amber, pointRadius: 0, tension: 0.2 },
+          { label: "Predicted", data: avp.predicted, borderColor: CHART_COLORS.teal, borderDash: [5,4], pointRadius: 0, tension: 0.2 },
+        ],
+      },
+      options: {
+        scales: {
+          x: { ticks: { maxTicksLimit: 6 } },
+          y: { ticks: { callback: v => "$" + (v/1e3).toFixed(0) + "k" } },
+        },
+      },
+    });
+  } else {
+    avpNote.textContent = "No held-out test-week predictions recorded for this store.";
+  }
+}
+
+init();
+</script>
+{% endblock %}

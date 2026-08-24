@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}WM-FORECAST · Overview{% endblock %}
+{% block content %}
+
+<section class="hero">
+  <div>
+    <span class="eyebrow">Weekly sales forecasting console</span>
+    <h1>Know next week's demand before the trucks are loaded.</h1>
+    <p>A production-grade forecasting model trained on five years of weekly sales across 45 Walmart stores — turned into a working console for demand forecasting, store-level diagnostics, and safety-stock planning.</p>
+    <div class="cta-row">
+      <a href="{{ url_for('forecast_page') }}" class="btn">Run a forecast →</a>
+      <a href="{{ url_for('dashboard') }}" class="btn btn-ghost">View dashboard</a>
+    </div>
+    <div class="chip-row">
+      <span class="chip">45 stores</span>
+      <span class="chip">143 weeks of history</span>
+      <span class="chip">18 engineered features</span>
+      <span class="chip">Best model: XGBoost</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="hero-panel-title">Model scorecard — held-out test weeks</div>
+    <div id="hero-metrics" class="loading">Reading scorecard…</div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<section class="section">
+  <h2>What's on the console</h2>
+  <div class="grid grid-3" style="margin-top:20px;">
+    <a href="{{ url_for('dashboard') }}" class="panel" style="display:block;">
+      <h3>02 · Dashboard</h3>
+      <p style="color:var(--text); margin-top:10px;">Total demand trend, holiday effect, top stores, and model comparison in one view.</p>
+    </a>
+    <a href="{{ url_for('stores_page') }}" class="panel" style="display:block;">
+      <h3>03 · Store Log</h3>
+      <p style="color:var(--text); margin-top:10px;">Drill into any of the 45 stores — sales history and actual-vs-predicted accuracy.</p>
+    </a>
+    <a href="{{ url_for('forecast_page') }}" class="panel" style="display:block;">
+      <h3>04 · Forecast</h3>
+      <p style="color:var(--text); margin-top:10px;">Generate a live 1–26 week forward forecast for any store, with adjustable assumptions.</p>
+    </a>
+    <a href="{{ url_for('stock_plan_page') }}" class="panel" style="display:block;">
+      <h3>05 · Stock Plan</h3>
+      <p style="color:var(--text); margin-top:10px;">Turn the forecast into a recommended stock number, with adjustable safety-stock buffer.</p>
+    </a>
+    <a href="{{ url_for('about_page') }}" class="panel" style="display:block;">
+      <h3>06 · Model</h3>
+      <p style="color:var(--text); margin-top:10px;">How the model was trained, which features mattered, and its known limits.</p>
+    </a>
+    <div class="panel panel-alt">
+      <h3>Data source</h3>
+      <p style="color:var(--text); margin-top:10px;">Walmart Store Sales, Kaggle (yasserh/walmart-dataset). Weekly, Feb 2010 – Dec 2012.</p>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function loadHeroMetrics() {
+  const el = document.getElementById("hero-metrics");
+  try {
+    const res = await fetch("/api/model-metrics");
+    const data = await res.json();
+    const rows = data.comparison;
+
+    let html = '<table><thead><tr><th>Model</th><th>MAE</th><th>RMSE</th><th>MAPE</th><th>WAPE</th></tr></thead><tbody>';
+    rows.forEach(r => {
+      const isBest = r.Model === data.metadata.best_model_name;
+      html += `<tr>
+        <td>${r.Model}${isBest ? ' <span class="tag tag-best">BEST</span>' : ''}</td>
+        <td>${fmtCurrency(r.MAE)}</td>
+        <td>${fmtCurrency(r.RMSE)}</td>
+        <td>${r["MAPE (%)"]}%</td>
+        <td>${r["WAPE (%)"]}%</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    el.outerHTML = `<div id="hero-metrics">${html}</div>`;
+  } catch (e) {
+    el.outerHTML = '<div class="error-box">Could not load model metrics from /api/model-metrics.</div>';
+  }
+}
+loadHeroMetrics();
+</script>
+{% endblock %}

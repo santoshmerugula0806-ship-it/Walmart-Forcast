@@ -1,0 +1,5 @@
+Model,MAE,RMSE,MAPE (%),WAPE (%)
+Naive (last week's sales),50361.57,75313.17,4.89,4.85
+Linear Regression,58795.67,81231.81,6.25,5.66
+Random Forest,42788.17,61521.01,4.18,4.12
+XGBoost,38008.09,54283.86,3.88,3.66

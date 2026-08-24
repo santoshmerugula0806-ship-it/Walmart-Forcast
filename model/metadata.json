@@ -1,0 +1,27 @@
+{
+  "feature_cols": [
+    "sales_lag_1",
+    "sales_lag_4",
+    "sales_lag_8",
+    "sales_lag_12",
+    "rolling_mean_4",
+    "rolling_mean_8",
+    "rolling_mean_12",
+    "rolling_std_4",
+    "rolling_std_8",
+    "rolling_std_12",
+    "Holiday_Flag",
+    "Temperature",
+    "Fuel_Price",
+    "CPI",
+    "Unemployment",
+    "month",
+    "week_of_year",
+    "quarter"
+  ],
+  "target": "Weekly_Sales",
+  "best_model_name": "XGBoost",
+  "model_format": "xgboost_json",
+  "safety_stock_pct": 0.15,
+  "lead_time_weeks": 2
+}

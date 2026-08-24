@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}WM-FORECAST · Stock Plan{% endblock %}
+
+{% block content %}
+<span class="eyebrow">05 · Stock Plan</span>
+<h1 style="font-size:32px;">Recommended stock by store</h1>
+<p>Turns the model's demand forecast into a recommended stock number: forecasted demand over the supplier lead time, plus a safety-stock buffer. Adjust both below and the plan recomputes instantly.</p>
+
+<div class="panel" style="margin: 24px 0;">
+  <div class="field-row">
+    <div class="field" style="margin-bottom:0;">
+      <label for="sp-safety">Safety stock buffer: <span id="sp-safety-val">15</span>%</label>
+      <input type="range" id="sp-safety" min="0" max="50" value="15">
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <label for="sp-lead">Supplier lead time: <span id="sp-lead-val">2</span> weeks</label>
+      <input type="range" id="sp-lead" min="1" max="12" value="2">
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-3" style="margin-bottom:20px;">
+  <div class="panel stat">
+    <div class="stat-label">Total recommended stock</div>
+    <div class="stat-value" id="sp-total">—</div>
+  </div>
+  <div class="panel stat">
+    <div class="stat-label">Total safety stock (buffer)</div>
+    <div class="stat-value" id="sp-buffer">—</div>
+  </div>
+  <div class="panel stat">
+    <div class="stat-label">Stores in plan</div>
+    <div class="stat-value" id="sp-count">—</div>
+  </div>
+</div>
+
+<div class="panel section">
+  <h3>By store</h3>
+  <canvas id="chart-stock" height="260"></canvas>
+</div>
+
+<div class="panel section">
+  <h3>Full plan</h3>
+  <div id="sp-table-wrap"><div class="loading">Loading plan…</div></div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+<script>
+const CHART_COLORS = { amber: "#F5A623", teal: "#3ED6B5", grid: "#2A3340", text: "#8B94A6" };
+Chart.defaults.color = CHART_COLORS.text;
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size = 11;
+Chart.defaults.borderColor = CHART_COLORS.grid;
+
+let stockChart;
+let debounceTimer;
+
+function initStockPage() {
+  const safety = document.getElementById("sp-safety");
+  const lead = document.getElementById("sp-lead");
+
+  safety.addEventListener("input", () => {
+    document.getElementById("sp-safety-val").textContent = safety.value;
+    debounceLoad();
+  });
+  lead.addEventListener("input", () => {
+    document.getElementById("sp-lead-val").textContent = lead.value;
+    debounceLoad();
+  });
+
+  loadPlan();
+}
+
+function debounceLoad() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(loadPlan, 200);
+}
+
+async function loadPlan() {
+  const pct = Number(document.getElementById("sp-safety").value) / 100;
+  const leadWeeks = Number(document.getElementById("sp-lead").value);
+
+  const res = await fetch(`/api/stock-plan?safety_stock_pct=${pct}&lead_time_weeks=${leadWeeks}`);
+  const data = await res.json();
+  renderPlan(data);
+}
+
+function renderPlan(data) {
+  const plan = data.plan;
+  const totalStock = plan.reduce((s, r) => s + r.recommended_stock, 0);
+  const totalBuffer = plan.reduce((s, r) => s + r.safety_stock, 0);
+
+  document.getElementById("sp-total").textContent = fmtCurrency(totalStock);
+  document.getElementById("sp-buffer").textContent = fmtCurrency(totalBuffer);
+  document.getElementById("sp-count").textContent = plan.length;
+
+  const sorted = [...plan].sort((a,b) => b.recommended_stock - a.recommended_stock);
+
+  if (stockChart) stockChart.destroy();
+  stockChart = new Chart(document.getElementById("chart-stock"), {
+    type: "bar",
+    data: {
+      labels: sorted.map(r => "S" + r.Store),
+      datasets: [
+        { label: "Forecasted demand", data: sorted.map(r => r.forecasted_demand), backgroundColor: CHART_COLORS.teal, borderRadius: 2 },
+        { label: "Safety stock", data: sorted.map(r => r.safety_stock), backgroundColor: CHART_COLORS.amber, borderRadius: 2 },
+      ],
+    },
+    options: {
+      scales: {
+        x: { stacked: true, ticks: { maxRotation: 90, minRotation: 90 } },
+        y: { stacked: true, ticks: { callback: v => "$" + (v/1e6).toFixed(1) + "M" } },
+      },
+    },
+  });
+
+  let rows = plan
+    .slice()
+    .sort((a,b) => a.Store - b.Store)
+    .map(r => `<tr>
+      <td>Store ${r.Store}</td>
+      <td>${fmtCurrency(r.forecasted_demand)}</td>
+      <td>${fmtCurrency(r.safety_stock)}</td>
+      <td><strong>${fmtCurrency(r.recommended_stock)}</strong></td>
+    </tr>`).join("");
+
+  document.getElementById("sp-table-wrap").innerHTML = `
+    <table>
+      <thead><tr><th>Store</th><th>Forecasted demand</th><th>Safety stock</th><th>Recommended stock</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+initStockPage();
+</script>
+{% endblock %}
