@@ -27,7 +27,7 @@ def load_everything():
     with open(os.path.join(MODEL_DIR, "metadata.json")) as f:
         _metadata = json.load(f)
 
-       model_format = _metadata.get("model_format", "joblib")
+    model_format = _metadata.get("model_format", "joblib")
     if model_format == "xgboost_json":
         _model = XGBRegressor(n_jobs=1)
         _model.load_model(os.path.join(MODEL_DIR, "best_model.json"))
