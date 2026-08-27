@@ -10,7 +10,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 MODEL_DIR = os.path.join(BASE_DIR, "model")
 
 _model = None
-_metadata = pip install -r requirements.txtNone
+_metadata = None
 _full_raw = None       # engineered features incl. NaN rows, all history, per store
 _full_clean = None      # engineered features, NaN-free (train+test)
 _model_comparison = None
