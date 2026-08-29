@@ -1,0 +1,434 @@
+{
+  "generated_at": "2026-08-29T01:02:41.935076+00:00",
+  "stores_checked": 45,
+  "alert_count": 17,
+  "high_count": 8,
+  "medium_count": 9,
+  "alerts": [
+    {
+      "store": 19,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 2925154.76,
+      "current_inventory": 2203679.26,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 438773.21,
+      "required_stock": 3363927.97,
+      "shortfall": 1160248.71,
+      "risk": "HIGH",
+      "recommend_reorder": true,
+      "recommend_expedite": true,
+      "supplier_lead_time_days": 5,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 19 has a projected shortfall of ~1,160,249 units, over 20% of forecasted demand (~2,925,155). This is HIGH risk per policy \u2014 recommend same-day review and an expedited order (5-day lead time) rather than waiting for the next cycle."
+    },
+    {
+      "store": 18,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 2260779.0,
+      "current_inventory": 1812186.62,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 339116.85,
+      "required_stock": 2599895.85,
+      "shortfall": 787709.23,
+      "risk": "HIGH",
+      "recommend_reorder": true,
+      "recommend_expedite": true,
+      "supplier_lead_time_days": 5,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 18 has a projected shortfall of ~787,709 units, over 20% of forecasted demand (~2,260,779). This is HIGH risk per policy \u2014 recommend same-day review and an expedited order (5-day lead time) rather than waiting for the next cycle."
+    },
+    {
+      "store": 24,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 2926109.24,
+      "current_inventory": 2729596.55,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 438916.39,
+      "required_stock": 3365025.63,
+      "shortfall": 635429.08,
+      "risk": "HIGH",
+      "recommend_reorder": true,
+      "recommend_expedite": true,
+      "supplier_lead_time_days": 5,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 24 has a projected shortfall of ~635,429 units, over 20% of forecasted demand (~2,926,109). This is HIGH risk per policy \u2014 recommend same-day review and an expedited order (5-day lead time) rather than waiting for the next cycle."
+    },
+    {
+      "store": 23,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 3101404.0,
+      "current_inventory": 2936008.79,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 465210.6,
+      "required_stock": 3566614.6,
+      "shortfall": 630605.81,
+      "risk": "HIGH",
+      "recommend_reorder": true,
+      "recommend_expedite": true,
+      "supplier_lead_time_days": 5,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 23 has a projected shortfall of ~630,606 units, over 20% of forecasted demand (~3,101,404). This is HIGH risk per policy \u2014 recommend same-day review and an expedited order (5-day lead time) rather than waiting for the next cycle."
+    },
+    {
+      "store": 43,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 1277069.62,
+      "current_inventory": 917964.62,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 191560.44,
+      "required_stock": 1468630.06,
+      "shortfall": 550665.44,
+      "risk": "HIGH",
+      "recommend_reorder": true,
+      "recommend_expedite": true,
+      "supplier_lead_time_days": 5,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 43 has a projected shortfall of ~550,665 units, over 20% of forecasted demand (~1,277,070). This is HIGH risk per policy \u2014 recommend same-day review and an expedited order (5-day lead time) rather than waiting for the next cycle."
+    },
+    {
+      "store": 45,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 1578272.81,
+      "current_inventory": 1483326.17,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 236740.92,
+      "required_stock": 1815013.73,
+      "shortfall": 331687.56,
+      "risk": "HIGH",
+      "recommend_reorder": true,
+      "recommend_expedite": true,
+      "supplier_lead_time_days": 5,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 45 has a projected shortfall of ~331,688 units, over 20% of forecasted demand (~1,578,273). This is HIGH risk per policy \u2014 recommend same-day review and an expedited order (5-day lead time) rather than waiting for the next cycle."
+    },
+    {
+      "store": 16,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 1014415.06,
+      "current_inventory": 840203.6,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 152162.26,
+      "required_stock": 1166577.32,
+      "shortfall": 326373.72,
+      "risk": "HIGH",
+      "recommend_reorder": true,
+      "recommend_expedite": true,
+      "supplier_lead_time_days": 5,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 16 has a projected shortfall of ~326,374 units, over 20% of forecasted demand (~1,014,415). This is HIGH risk per policy \u2014 recommend same-day review and an expedited order (5-day lead time) rather than waiting for the next cycle."
+    },
+    {
+      "store": 5,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 754070.09,
+      "current_inventory": 650847.0,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 113110.51,
+      "required_stock": 867180.6,
+      "shortfall": 216333.6,
+      "risk": "HIGH",
+      "recommend_reorder": true,
+      "recommend_expedite": true,
+      "supplier_lead_time_days": 5,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 5 has a projected shortfall of ~216,334 units, over 20% of forecasted demand (~754,070). This is HIGH risk per policy \u2014 recommend same-day review and an expedited order (5-day lead time) rather than waiting for the next cycle."
+    },
+    {
+      "store": 39,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 3201350.88,
+      "current_inventory": 3183574.32,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 480202.63,
+      "required_stock": 3681553.51,
+      "shortfall": 497979.19,
+      "risk": "MEDIUM",
+      "recommend_reorder": true,
+      "recommend_expedite": false,
+      "supplier_lead_time_days": 14,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 39 has a projected shortfall of ~497,979 units against forecasted demand of ~3,201,351 over the next 2 weeks. This is within the MEDIUM band \u2014 add it to the next scheduled order (standard 14-day lead time)."
+    },
+    {
+      "store": 32,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 2518638.25,
+      "current_inventory": 2542879.17,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 377795.74,
+      "required_stock": 2896433.99,
+      "shortfall": 353554.82,
+      "risk": "MEDIUM",
+      "recommend_reorder": true,
+      "recommend_expedite": false,
+      "supplier_lead_time_days": 14,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 32 has a projected shortfall of ~353,555 units against forecasted demand of ~2,518,638 over the next 2 weeks. This is within the MEDIUM band \u2014 add it to the next scheduled order (standard 14-day lead time)."
+    },
+    {
+      "store": 41,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 2904107.0,
+      "current_inventory": 3213642.03,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 435616.05,
+      "required_stock": 3339723.05,
+      "shortfall": 126081.02,
+      "risk": "MEDIUM",
+      "recommend_reorder": true,
+      "recommend_expedite": false,
+      "supplier_lead_time_days": 14,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 41 has a projected shortfall of ~126,081 units against forecasted demand of ~2,904,107 over the next 2 weeks. This is within the MEDIUM band \u2014 add it to the next scheduled order (standard 14-day lead time)."
+    },
+    {
+      "store": 25,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 1507950.06,
+      "current_inventory": 1634759.93,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 226192.51,
+      "required_stock": 1734142.57,
+      "shortfall": 99382.64,
+      "risk": "MEDIUM",
+      "recommend_reorder": true,
+      "recommend_expedite": false,
+      "supplier_lead_time_days": 14,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 25 has a projected shortfall of ~99,383 units against forecasted demand of ~1,507,950 over the next 2 weeks. This is within the MEDIUM band \u2014 add it to the next scheduled order (standard 14-day lead time)."
+    },
+    {
+      "store": 44,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 715444.25,
+      "current_inventory": 736111.07,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 107316.64,
+      "required_stock": 822760.89,
+      "shortfall": 86649.82,
+      "risk": "MEDIUM",
+      "recommend_reorder": true,
+      "recommend_expedite": false,
+      "supplier_lead_time_days": 14,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 44 has a projected shortfall of ~86,650 units against forecasted demand of ~715,444 over the next 2 weeks. This is within the MEDIUM band \u2014 add it to the next scheduled order (standard 14-day lead time)."
+    },
+    {
+      "store": 12,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 1973671.88,
+      "current_inventory": 2195044.88,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 296050.78,
+      "required_stock": 2269722.66,
+      "shortfall": 74677.78,
+      "risk": "MEDIUM",
+      "recommend_reorder": true,
+      "recommend_expedite": false,
+      "supplier_lead_time_days": 14,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 12 has a projected shortfall of ~74,678 units against forecasted demand of ~1,973,672 over the next 2 weeks. This is within the MEDIUM band \u2014 add it to the next scheduled order (standard 14-day lead time)."
+    },
+    {
+      "store": 38,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 869270.25,
+      "current_inventory": 932579.99,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 130390.54,
+      "required_stock": 999660.79,
+      "shortfall": 67080.8,
+      "risk": "MEDIUM",
+      "recommend_reorder": true,
+      "recommend_expedite": false,
+      "supplier_lead_time_days": 14,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 38 has a projected shortfall of ~67,081 units against forecasted demand of ~869,270 over the next 2 weeks. This is within the MEDIUM band \u2014 add it to the next scheduled order (standard 14-day lead time)."
+    },
+    {
+      "store": 20,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 4450480.0,
+      "current_inventory": 5066984.93,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 667572.0,
+      "required_stock": 5118052.0,
+      "shortfall": 51067.07,
+      "risk": "MEDIUM",
+      "recommend_reorder": true,
+      "recommend_expedite": false,
+      "supplier_lead_time_days": 14,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 20 has a projected shortfall of ~51,067 units against forecasted demand of ~4,450,480 over the next 2 weeks. This is within the MEDIUM band \u2014 add it to the next scheduled order (standard 14-day lead time)."
+    },
+    {
+      "store": 3,
+      "lead_time_weeks": 2,
+      "forecasted_demand": 902521.0,
+      "current_inventory": 1023886.07,
+      "safety_stock_pct": 0.15,
+      "safety_stock": 135378.15,
+      "required_stock": 1037899.15,
+      "shortfall": 14013.08,
+      "risk": "MEDIUM",
+      "recommend_reorder": true,
+      "recommend_expedite": false,
+      "supplier_lead_time_days": 14,
+      "policy_sources": [
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Minimum inventory threshold"
+        },
+        {
+          "doc": "inventory_policy.md",
+          "heading": "Reorder trigger"
+        }
+      ],
+      "explanation": "Store 3 has a projected shortfall of ~14,013 units against forecasted demand of ~902,521 over the next 2 weeks. This is within the MEDIUM band \u2014 add it to the next scheduled order (standard 14-day lead time)."
+    }
+  ]
+}

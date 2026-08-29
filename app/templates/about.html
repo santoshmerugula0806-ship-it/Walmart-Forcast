@@ -2,23 +2,35 @@
 {% block title %}WM-FORECAST · Model{% endblock %}
 
 {% block content %}
-<span class="eyebrow">06 · Model</span>
+<span class="eyebrow">09 · Model</span>
 <h1 style="font-size:32px;">How the forecast is built</h1>
 
-<div class="grid grid-2" style="margin-top: 28px;">
+<div class="panel section">
+  <h3>System architecture</h3>
+  <p style="color:var(--text);">Five pieces work together rather than as separate bolt-ons:</p>
+  <ul style="color:var(--text-muted); line-height:1.9; padding-left:20px;">
+    <li><strong style="color:var(--text);">Deep Learning</strong> — an LSTM sequence model (Forecast page, "LSTM" option) supplements the XGBoost baseline, learning temporal patterns directly from the last 12 weeks of raw history per store instead of hand-engineered lag features.</li>
+    <li><strong style="color:var(--text);">Explainable AI</strong> — the <a href="{{ url_for('explain_page') }}" style="color:var(--teal);">Explain page</a> uses SHAP to show exactly which features pushed a given store's forecast up or down from the model's baseline.</li>
+    <li><strong style="color:var(--text);">RAG</strong> — the <a href="{{ url_for('ai_assistant_page') }}" style="color:var(--teal);">AI Assistant</a>'s "Ask a policy question" mode retrieves grounded answers from the inventory policy, supplier rules, store guidelines, stock thresholds, holiday calendar, and product-information documents.</li>
+    <li><strong style="color:var(--text);">Agentic AI</strong> — the AI Assistant's "Check a store" mode runs an agent that calls the forecast, (simulated) inventory, supplier lead-time, and policy tools together, then reasons through a reorder decision.</li>
+    <li><strong style="color:var(--text);">Automation</strong> — the <a href="{{ url_for('alerts_page') }}" style="color:var(--teal);">Alerts page</a> runs that same agent across every store on a daily schedule and surfaces anything MEDIUM/HIGH risk.</li>
+  </ul>
+</div>
+
+<div class="grid grid-2" style="margin-top: 24px;">
   <div class="panel">
     <h3>Data</h3>
     <p style="color:var(--text);">Walmart Store Sales (Kaggle, yasserh/walmart-dataset) — 6,435 weekly records across 45 stores, Feb 2010 to Dec 2012. Includes weekly sales, holiday flag, temperature, fuel price, CPI, and unemployment.</p>
     <h3 style="margin-top:20px;">Feature engineering</h3>
-    <p style="color:var(--text);">Per store: sales lags at 1/4/8/12 weeks, rolling mean &amp; std over 4/8/12 weeks (computed on a 1-week-shifted window so a week's own sales never leak into its own average), plus month, week-of-year, and quarter.</p>
+    <p style="color:var(--text);">Per store: sales lags at 1/4/8/12 weeks, rolling mean &amp; std over 4/8/12 weeks (computed on a 1-week-shifted window so a week's own sales never leak into its own average), plus month, week-of-year, and quarter. The LSTM instead consumes 12 weeks of raw sales + exogenous features as a sequence and learns temporal patterns itself.</p>
     <h3 style="margin-top:20px;">Split</h3>
-    <p style="color:var(--text);">Time-based, never random — the model is always trained on the past and evaluated on the future. 80% train / 20% test by date.</p>
+    <p style="color:var(--text);">Time-based, never random — every model (including the LSTM) is trained on the past and evaluated on the future, using the same split date, so comparisons below are apples-to-apples.</p>
   </div>
 
   <div class="panel">
     <h3>Models compared</h3>
     <div id="about-metrics" class="loading">Loading…</div>
-    <p style="margin-top:14px; font-size:12.5px;">WAPE (Weighted Absolute Percentage Error) is the primary metric — standard for retail demand forecasting because it weights errors by sales volume rather than treating every week equally.</p>
+    <p style="margin-top:14px; font-size:12.5px;">WAPE (Weighted Absolute Percentage Error) is the primary metric — standard for retail demand forecasting because it weights errors by sales volume rather than treating every week equally. On this dataset's size (~6.4k rows), XGBoost's hand-engineered lag/rolling features currently edge out the LSTM — the LSTM tends to close that gap as more historical data accumulates.</p>
   </div>
 </div>
 

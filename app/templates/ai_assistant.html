@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}WM-FORECAST · AI Assistant{% endblock %}
+
+{% block content %}
+<span class="eyebrow">07 · AI Assistant</span>
+<h1 style="font-size:32px;">Ask Walmart AI</h1>
+<p>Two modes. <strong>Ask a policy question</strong> retrieves grounded answers from the inventory policy, supplier rules, store guidelines, stock thresholds, holiday calendar, and product-information documents (RAG). <strong>Check a store</strong> runs the AI agent: it pulls the forecast, simulated inventory, supplier lead time, and policy together into a reorder decision.</p>
+
+<div class="grid" style="grid-template-columns: 1fr 1fr; gap:24px; margin-top:24px; align-items:start;">
+
+  <div class="panel section">
+    <h3>Ask a policy question</h3>
+    <div class="field">
+      <label for="rag-q">Question</label>
+      <input type="text" id="rag-q" placeholder="e.g. What's the safety stock percentage?" style="width:100%;">
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+      <button class="btn-sm" data-q="What is the safety stock percentage?">Safety stock %</button>
+      <button class="btn-sm" data-q="How long is the supplier lead time?">Lead time</button>
+      <button class="btn-sm" data-q="When does risk get escalated to HIGH?">HIGH risk rule</button>
+      <button class="btn-sm" data-q="Does this app have real inventory data?">Data limitations</button>
+    </div>
+    <button class="btn" id="rag-run" style="width:100%;">Ask</button>
+    <div id="rag-answer" style="margin-top:16px;"></div>
+  </div>
+
+  <div class="panel section">
+    <h3>Check a store (AI Agent)</h3>
+    <div class="field">
+      <label for="ag-store">Store</label>
+      <select id="ag-store"></select>
+    </div>
+    <div class="field">
+      <label for="ag-lead">Lead time to check against: <span id="ag-lead-val">2</span> weeks</label>
+      <input type="range" id="ag-lead" min="1" max="8" value="2">
+    </div>
+    <button class="btn" id="ag-run" style="width:100%;">Check store</button>
+    <div id="ag-answer" style="margin-top:16px;"></div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<style>
+.btn-sm{ background:var(--panel-alt); border:1px solid var(--border); color:var(--text-muted); font-size:11px; padding:5px 10px; border-radius:2px; cursor:pointer; font-family: var(--font-mono); }
+.btn-sm:hover{ color:var(--text); border-color:var(--teal); }
+.risk-badge{ display:inline-block; padding:2px 8px; border-radius:2px; font-family:var(--font-mono); font-size:11px; font-weight:700; letter-spacing:0.04em; }
+.risk-LOW{ background:rgba(62,214,181,0.15); color:var(--teal); }
+.risk-MEDIUM{ background:rgba(245,166,35,0.15); color:var(--amber); }
+.risk-HIGH{ background:rgba(255,107,92,0.15); color:var(--red); }
+</style>
+<script>
+async function initAssistantPage() {
+  const res = await fetch("/api/stores");
+  const stores = await res.json();
+  document.getElementById("ag-store").innerHTML = stores.map(s => `<option value="${s.store}">Store ${s.store}</option>`).join("");
+
+  document.getElementById("ag-lead").addEventListener("input", (e) => {
+    document.getElementById("ag-lead-val").textContent = e.target.value;
+  });
+
+  document.querySelectorAll(".btn-sm").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.getElementById("rag-q").value = btn.dataset.q;
+      askRag();
+    });
+  });
+
+  document.getElementById("rag-run").addEventListener("click", askRag);
+  document.getElementById("rag-q").addEventListener("keydown", (e) => { if (e.key === "Enter") askRag(); });
+  document.getElementById("ag-run").addEventListener("click", checkAgent);
+}
+
+async function askRag() {
+  const question = document.getElementById("rag-q").value.trim();
+  if (!question) return;
+  const out = document.getElementById("rag-answer");
+  out.innerHTML = `<div class="loading">Retrieving…</div>`;
+  try {
+    const res = await fetch("/api/ask", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ question }),
+    });
+    const data = await res.json();
+    const sources = data.sources.map(s => `<span class="mono" style="font-size:11px; color:var(--text-faint);">${s.doc} — ${s.heading}</span>`).join("<br>");
+    out.innerHTML = `
+      <div class="panel" style="background:var(--panel-alt); padding:14px; white-space:pre-wrap; line-height:1.5;">${escapeHtml(data.answer)}</div>
+      ${sources ? `<div style="margin-top:10px;"><div style="font-size:11px; color:var(--text-faint); text-transform:uppercase; margin-bottom:4px;">Sources</div>${sources}</div>` : ""}
+    `;
+  } catch (e) {
+    out.innerHTML = `<div class="error-box">Could not answer that. ${e.message}</div>`;
+  }
+}
+
+async function checkAgent() {
+  const store = document.getElementById("ag-store").value;
+  const lead_time_weeks = document.getElementById("ag-lead").value;
+  const out = document.getElementById("ag-answer");
+  out.innerHTML = `<div class="loading">Agent running: forecast → inventory → supplier → policy…</div>`;
+  try {
+    const res = await fetch("/api/agent", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ store: Number(store), lead_time_weeks: Number(lead_time_weeks) }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    out.innerHTML = `
+      <div class="panel" style="background:var(--panel-alt); padding:14px;">
+        <span class="risk-badge risk-${data.risk}">${data.risk} RISK</span>
+        <p style="margin:10px 0; line-height:1.5;">${escapeHtml(data.explanation)}</p>
+        <table style="margin-top:10px;">
+          <tbody>
+            <tr><td>Forecasted demand (${data.lead_time_weeks}w)</td><td class="mono">${fmtCurrency(data.forecasted_demand)}</td></tr>
+            <tr><td>Current inventory (simulated)</td><td class="mono">${fmtCurrency(data.current_inventory)}</td></tr>
+            <tr><td>Safety stock (${(data.safety_stock_pct*100).toFixed(0)}%)</td><td class="mono">${fmtCurrency(data.safety_stock)}</td></tr>
+            <tr><td>Required stock</td><td class="mono">${fmtCurrency(data.required_stock)}</td></tr>
+            <tr><td>Shortfall</td><td class="mono">${fmtCurrency(data.shortfall)}</td></tr>
+            <tr><td>Supplier lead time</td><td class="mono">${data.supplier_lead_time_days} days${data.recommend_expedite ? " (expedited)" : ""}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (e) {
+    out.innerHTML = `<div class="error-box">${e.message}</div>`;
+  }
+}
+
+function escapeHtml(s) {
+  const d = document.createElement("div");
+  d.innerText = s;
+  return d.innerHTML;
+}
+
+initAssistantPage();
+</script>
+{% endblock %}

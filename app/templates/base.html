@@ -27,7 +27,10 @@
     <a href="{{ url_for('stores_page') }}" class="{{ 'active' if request.path == '/stores' else '' }}">03 · Store Log</a>
     <a href="{{ url_for('forecast_page') }}" class="{{ 'active' if request.path == '/forecast' else '' }}">04 · Forecast</a>
     <a href="{{ url_for('stock_plan_page') }}" class="{{ 'active' if request.path == '/stock-plan' else '' }}">05 · Stock Plan</a>
-    <a href="{{ url_for('about_page') }}" class="{{ 'active' if request.path == '/about' else '' }}">06 · Model</a>
+    <a href="{{ url_for('explain_page') }}" class="{{ 'active' if request.path == '/explain' else '' }}">06 · Explain</a>
+    <a href="{{ url_for('ai_assistant_page') }}" class="{{ 'active' if request.path == '/ai-assistant' else '' }}">07 · AI Assistant</a>
+    <a href="{{ url_for('alerts_page') }}" class="{{ 'active' if request.path == '/alerts' else '' }}">08 · Alerts</a>
+    <a href="{{ url_for('about_page') }}" class="{{ 'active' if request.path == '/about' else '' }}">09 · Model</a>
   </nav>
   <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation">☰</button>
 </header>

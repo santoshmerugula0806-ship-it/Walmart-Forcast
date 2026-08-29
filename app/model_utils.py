@@ -19,10 +19,16 @@ _actual_vs_predicted = None
 _row_predictions = None
 _production_plan = None
 
+# Deep learning (LSTM) — optional, degrades gracefully if torch/artifacts absent
+_lstm_model = None
+_lstm_meta = None
+_lstm_available = False
+
 
 def load_everything():
     global _model, _metadata, _full_raw, _full_clean, _model_comparison
     global _feature_importance, _actual_vs_predicted, _row_predictions, _production_plan
+    global _lstm_model, _lstm_meta, _lstm_available
 
     with open(os.path.join(MODEL_DIR, "metadata.json")) as f:
         _metadata = json.load(f)
@@ -42,6 +48,32 @@ def load_everything():
     _actual_vs_predicted = pd.read_csv(os.path.join(MODEL_DIR, "actual_vs_predicted_weekly.csv"))
     _row_predictions = pd.read_csv(os.path.join(MODEL_DIR, "row_predictions.csv"))
     _production_plan = pd.read_csv(os.path.join(MODEL_DIR, "production_plan.csv"))
+
+    try:
+        import torch
+        from lstm_model import LSTMForecaster
+
+        lstm_meta_path = os.path.join(MODEL_DIR, "lstm_meta.json")
+        lstm_weights_path = os.path.join(MODEL_DIR, "lstm_model.pt")
+        if os.path.exists(lstm_meta_path) and os.path.exists(lstm_weights_path):
+            with open(lstm_meta_path) as f:
+                _lstm_meta = json.load(f)
+            _lstm_model = LSTMForecaster(
+                n_features=len(_lstm_meta["feature_cols"]),
+                hidden_size=_lstm_meta["hidden_size"],
+                num_layers=_lstm_meta["num_layers"],
+                dropout=_lstm_meta["dropout"],
+            )
+            _lstm_model.load_state_dict(torch.load(lstm_weights_path, map_location="cpu"))
+            _lstm_model.eval()
+            _lstm_available = True
+    except Exception as e:
+        print(f"[model_utils] LSTM model not available: {e}")
+        _lstm_available = False
+
+
+def lstm_is_available():
+    return _lstm_available
 
 
 def get_metadata():
@@ -213,6 +245,119 @@ def forecast_store(store_id, weeks=4, overrides=None):
         "last_known_sales": round(float(last_row["Weekly_Sales"]), 2),
         "assumptions": exogenous_defaults,
         "forecast": results,
+    }
+
+
+def lstm_forecast_store(store_id, weeks=4, overrides=None):
+    """
+    Recursive multi-step forecast using the LSTM, mirroring forecast_store()'s
+    interface/output shape so the frontend can switch models transparently.
+    """
+    if not _lstm_available:
+        return None
+    import torch
+
+    overrides = overrides or {}
+    seq_len = _lstm_meta["seq_len"]
+    feature_cols = _lstm_meta["feature_cols"]  # Weekly_Sales_log, Holiday_Flag, Temperature, Fuel_Price, CPI, Unemployment, month_sin/cos, week_sin/cos
+    mean = np.array(_lstm_meta["mean"])
+    std = np.array(_lstm_meta["std"])
+    scale_idx = _lstm_meta["scale_idx"]
+    y_mean, y_std = _lstm_meta["y_mean"], _lstm_meta["y_std"]
+
+    grp = _full_raw[_full_raw["Store"] == store_id].sort_values("Date").reset_index(drop=True)
+    if len(grp) < seq_len:
+        return None
+
+    last_row = grp.iloc[-1]
+    cur_date = pd.Timestamp(last_row["Date"])
+
+    exogenous_defaults = {
+        "Holiday_Flag": int(last_row["Holiday_Flag"]),
+        "Temperature": float(last_row["Temperature"]),
+        "Fuel_Price": float(last_row["Fuel_Price"]),
+        "CPI": float(last_row["CPI"]),
+        "Unemployment": float(last_row["Unemployment"]),
+    }
+    exogenous_defaults.update(overrides)
+
+    # Build the raw (unscaled) rolling window: last seq_len rows -> feature vectors
+    tail = grp.tail(seq_len).copy()
+    window = []
+    for _, r in tail.iterrows():
+        d = pd.Timestamp(r["Date"])
+        window.append(_lstm_feature_row(
+            np.log1p(float(r["Weekly_Sales"])), int(r["Holiday_Flag"]), float(r["Temperature"]),
+            float(r["Fuel_Price"]), float(r["CPI"]), float(r["Unemployment"]), d.month, int(d.isocalendar().week),
+        ))
+
+    results = []
+    for _ in range(weeks):
+        cur_date = cur_date + pd.Timedelta(weeks=1)
+        X = np.array(window[-seq_len:], dtype=np.float32).copy()
+        X[:, scale_idx] = (X[:, scale_idx] - mean) / std
+        with torch.no_grad():
+            pred_s = _lstm_model(torch.tensor(X).unsqueeze(0)).item()
+        pred_log = pred_s * y_std + y_mean
+        pred = max(float(np.expm1(pred_log)), 0.0)
+
+        results.append({"date": cur_date.strftime("%Y-%m-%d"), "predicted_sales": round(pred, 2)})
+
+        window.append(_lstm_feature_row(
+            np.log1p(pred), exogenous_defaults["Holiday_Flag"], exogenous_defaults["Temperature"],
+            exogenous_defaults["Fuel_Price"], exogenous_defaults["CPI"], exogenous_defaults["Unemployment"],
+            cur_date.month, int(cur_date.isocalendar().week),
+        ))
+
+    return {
+        "store": store_id,
+        "model": "LSTM",
+        "last_known_date": pd.Timestamp(last_row["Date"]).strftime("%Y-%m-%d"),
+        "last_known_sales": round(float(last_row["Weekly_Sales"]), 2),
+        "assumptions": exogenous_defaults,
+        "forecast": results,
+    }
+
+
+def _lstm_feature_row(log_sales, holiday, temp, fuel, cpi, unemp, month, week):
+    return [
+        log_sales, holiday, temp, fuel, cpi, unemp,
+        np.sin(2 * np.pi * month / 12), np.cos(2 * np.pi * month / 12),
+        np.sin(2 * np.pi * week / 52), np.cos(2 * np.pi * week / 52),
+    ]
+
+
+def explain_forecast(store_id, model_name="xgboost"):
+    """
+    Explainable AI (XAI): SHAP contributions for the *next single-week*
+    forecast for a store, using the production XGBoost model (tree SHAP is
+    exact and fast for XGBoost; that's what backs the /explain page).
+    """
+    import shap
+
+    row = get_latest_known_state(store_id)
+    if row is None:
+        return None
+
+    X = _row_to_feature_vector(row)
+    explainer = shap.TreeExplainer(_model)
+    shap_values = explainer.shap_values(X)[0]
+    base_value = float(explainer.expected_value)
+    prediction = float(_model.predict(X)[0])
+
+    contributions = [
+        {"feature": col, "value": float(row[col]) if isinstance(row[col], (int, float, np.floating, np.integer)) else row[col],
+         "contribution": round(float(sv), 2)}
+        for col, sv in zip(_metadata["feature_cols"], shap_values)
+    ]
+    contributions.sort(key=lambda c: abs(c["contribution"]), reverse=True)
+
+    return {
+        "store": store_id,
+        "base_value": round(base_value, 2),
+        "prediction": round(prediction, 2),
+        "contributions": contributions,
+        "as_of_date": row["Date"],
     }
 
 

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}WM-FORECAST · Alerts{% endblock %}
+
+{% block content %}
+<span class="eyebrow">08 · Alerts</span>
+<h1 style="font-size:32px;">Automated stockout-risk alerts</h1>
+<p>Runs the AI agent across every store (forecast → simulated inventory → supplier lead time → policy) on a daily schedule and surfaces anything MEDIUM or HIGH risk. Trigger a fresh sweep manually below, or wait for the 08:00 scheduled run.</p>
+
+<div class="panel" style="margin: 24px 0; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+  <div>
+    <div style="font-size:11px; color:var(--text-faint); text-transform:uppercase;">Last run</div>
+    <div class="mono" id="al-generated" style="font-size:14px;">—</div>
+  </div>
+  <button class="btn" id="al-run">Run check now</button>
+</div>
+
+<div class="grid grid-3" style="margin-bottom:20px;">
+  <div class="panel stat">
+    <div class="stat-label">Stores checked</div>
+    <div class="stat-value" id="al-checked">—</div>
+  </div>
+  <div class="panel stat">
+    <div class="stat-label">HIGH risk</div>
+    <div class="stat-value" id="al-high" style="color:var(--red);">—</div>
+  </div>
+  <div class="panel stat">
+    <div class="stat-label">MEDIUM risk</div>
+    <div class="stat-value" id="al-medium" style="color:var(--amber);">—</div>
+  </div>
+</div>
+
+<div class="panel section">
+  <h3>Alerts</h3>
+  <div id="al-list"><div class="loading">Loading…</div></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<style>
+.risk-badge{ display:inline-block; padding:2px 8px; border-radius:2px; font-family:var(--font-mono); font-size:11px; font-weight:700; letter-spacing:0.04em; }
+.risk-LOW{ background:rgba(62,214,181,0.15); color:var(--teal); }
+.risk-MEDIUM{ background:rgba(245,166,35,0.15); color:var(--amber); }
+.risk-HIGH{ background:rgba(255,107,92,0.15); color:var(--red); }
+.alert-row{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 0; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.alert-row:last-child{ border-bottom:none; }
+</style>
+<script>
+async function initAlertsPage() {
+  document.getElementById("al-run").addEventListener("click", runCheck);
+  loadAlerts();
+}
+
+async function loadAlerts() {
+  const res = await fetch("/api/alerts");
+  const data = await res.json();
+  renderAlerts(data);
+}
+
+async function runCheck() {
+  const btn = document.getElementById("al-run");
+  btn.disabled = true;
+  btn.textContent = "Running…";
+  try {
+    const res = await fetch("/api/alerts/run", { method: "POST" });
+    const data = await res.json();
+    renderAlerts(data);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Run check now";
+  }
+}
+
+function renderAlerts(data) {
+  document.getElementById("al-generated").textContent = new Date(data.generated_at).toLocaleString();
+  document.getElementById("al-checked").textContent = data.stores_checked;
+  document.getElementById("al-high").textContent = data.high_count;
+  document.getElementById("al-medium").textContent = data.medium_count;
+
+  if (!data.alerts.length) {
+    document.getElementById("al-list").innerHTML = `<div class="loading">No stores at MEDIUM or HIGH risk right now.</div>`;
+    return;
+  }
+
+  const rows = data.alerts.map(a => `
+    <div class="alert-row">
+      <div>
+        <span class="risk-badge risk-${a.risk}">${a.risk}</span>
+        <strong style="margin-left:8px;">Store ${a.store}</strong>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:4px; max-width:640px;">${a.explanation}</div>
+      </div>
+      <div class="mono" style="text-align:right; font-size:12px; color:var(--text-muted); flex-shrink:0;">
+        Shortfall: <span style="color:${a.risk === 'HIGH' ? 'var(--red)' : 'var(--amber)'}">${fmtCurrency(a.shortfall)}</span>
+      </div>
+    </div>
+  `).join("");
+  document.getElementById("al-list").innerHTML = rows;
+}
+
+initAlertsPage();
+</script>
+{% endblock %}

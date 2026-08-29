@@ -5,3 +5,20 @@ scikit-learn>=1.4,<1.6
 xgboost>=2.0,<2.2
 joblib>=1.3,<1.6
 gunicorn>=21.2,<23
+
+# Deep Learning (LSTM demand forecaster)
+torch>=2.2,<3.0
+
+# Explainable AI (SHAP contributions behind /explain)
+shap>=0.45,<0.47
+
+# RAG (embeddings/retrieval over the policy knowledge base)
+rank-bm25>=0.2.2,<0.3
+
+# Automation (scheduled daily forecast + stockout-risk checks)
+APScheduler>=3.10,<3.11
+
+# Optional: only used if ANTHROPIC_API_KEY is set, to let the AI Assistant
+# and Agent generate natural-language answers on top of retrieved/tool data.
+# The app works fully without it (deterministic template answers instead).
+anthropic>=0.34,<1.0

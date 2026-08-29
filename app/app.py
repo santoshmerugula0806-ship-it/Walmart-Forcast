@@ -1,9 +1,14 @@
 from flask import Flask, render_template, jsonify, request
 import model_utils as mu
+import rag_utils as rag
+import agent
+import automation
 
 app = Flask(__name__)
 
 mu.load_everything()
+rag.build_index()
+automation.start_scheduler()
 
 
 # ---------------------------------------------------------------- pages ----
@@ -25,12 +30,27 @@ def stores_page():
 
 @app.route("/forecast")
 def forecast_page():
-    return render_template("forecast.html")
+    return render_template("forecast.html", lstm_available=mu.lstm_is_available())
 
 
 @app.route("/stock-plan")
 def stock_plan_page():
     return render_template("stock_plan.html")
+
+
+@app.route("/explain")
+def explain_page():
+    return render_template("explain.html")
+
+
+@app.route("/ai-assistant")
+def ai_assistant_page():
+    return render_template("ai_assistant.html")
+
+
+@app.route("/alerts")
+def alerts_page():
+    return render_template("alerts.html")
 
 
 @app.route("/about")
@@ -45,6 +65,7 @@ def api_model_metrics():
     return jsonify({
         "metadata": mu.get_metadata(),
         "comparison": mu.get_model_comparison(),
+        "lstm_available": mu.lstm_is_available(),
     })
 
 
@@ -98,13 +119,22 @@ def api_forecast():
     store_id = int(body.get("store"))
     weeks = int(body.get("weeks", 4))
     weeks = max(1, min(weeks, 26))
+    model_choice = (body.get("model") or "xgboost").lower()
 
     overrides = {}
     for key in ["Holiday_Flag", "Temperature", "Fuel_Price", "CPI", "Unemployment"]:
         if key in body and body[key] not in (None, ""):
             overrides[key] = float(body[key]) if key != "Holiday_Flag" else int(body[key])
 
-    result = mu.forecast_store(store_id, weeks=weeks, overrides=overrides)
+    if model_choice == "lstm":
+        if not mu.lstm_is_available():
+            return jsonify({"error": "LSTM model not available on this server"}), 503
+        result = mu.lstm_forecast_store(store_id, weeks=weeks, overrides=overrides)
+    else:
+        result = mu.forecast_store(store_id, weeks=weeks, overrides=overrides)
+        if result is not None:
+            result["model"] = "XGBoost"
+
     if result is None:
         return jsonify({"error": "store not found"}), 404
     return jsonify(result)
@@ -121,6 +151,65 @@ def api_stock_plan():
         "lead_time_weeks": lead_time_weeks,
         "plan": plan,
     })
+
+
+# --------------------------------------------------- explainable ai (xai) --
+
+@app.route("/api/explain")
+def api_explain():
+    store_id = int(request.args.get("store", 1))
+    result = mu.explain_forecast(store_id)
+    if result is None:
+        return jsonify({"error": "store not found"}), 404
+    return jsonify(result)
+
+
+# ------------------------------------------------------------- rag / ask --
+
+@app.route("/api/ask", methods=["POST"])
+def api_ask():
+    body = request.get_json(force=True) or {}
+    question = (body.get("question") or "").strip()
+    if not question:
+        return jsonify({"error": "question is required"}), 400
+    result = rag.answer_question(question)
+    return jsonify(result)
+
+
+# ----------------------------------------------------------- agentic ai --
+
+@app.route("/api/agent", methods=["POST"])
+def api_agent():
+    body = request.get_json(force=True) or {}
+    store_id = body.get("store")
+    question = body.get("question", "").strip()
+    lead_time_weeks = int(body.get("lead_time_weeks", agent.LEAD_TIME_WEEKS))
+
+    if store_id is None:
+        return jsonify({"error": "store is required"}), 400
+    store_id = int(store_id)
+
+    result = agent.ask_agent(question or f"Check Store {store_id} and tell me whether we need to reorder.",
+                              store_id=store_id, lead_time_weeks=lead_time_weeks)
+    if "error" in result:
+        return jsonify(result), 404
+    return jsonify(result)
+
+
+# -------------------------------------------------------- automation ------
+
+@app.route("/api/alerts")
+def api_alerts():
+    payload = automation.get_latest_alerts()
+    if payload is None:
+        payload = automation.run_daily_check()
+    return jsonify(payload)
+
+
+@app.route("/api/alerts/run", methods=["POST"])
+def api_alerts_run():
+    payload = automation.run_daily_check()
+    return jsonify(payload)
 
 
 if __name__ == "__main__":

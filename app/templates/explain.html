@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}WM-FORECAST · Explain{% endblock %}
+
+{% block content %}
+<span class="eyebrow">06 · Explain</span>
+<h1 style="font-size:32px;">Why did the model predict this?</h1>
+<p>Explainable AI (XAI) for the production XGBoost model. Pick a store to see the SHAP contribution of every feature to its next-week forecast — how much each factor pushed the prediction up or down from the model's baseline.</p>
+
+<div class="panel" style="margin: 24px 0;">
+  <div class="field-row">
+    <div class="field" style="margin-bottom:0; max-width:240px;">
+      <label for="ex-store">Store</label>
+      <select id="ex-store"></select>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-3" style="margin-bottom:20px;">
+  <div class="panel stat">
+    <div class="stat-label">Baseline (average prediction)</div>
+    <div class="stat-value" id="ex-base">—</div>
+  </div>
+  <div class="panel stat">
+    <div class="stat-label">Final forecast (next week)</div>
+    <div class="stat-value" id="ex-pred">—</div>
+  </div>
+  <div class="panel stat">
+    <div class="stat-label">As of</div>
+    <div class="stat-value" id="ex-date" style="font-size:18px;">—</div>
+  </div>
+</div>
+
+<div class="panel section">
+  <h3>Feature contributions</h3>
+  <p style="color:var(--text-muted); font-size:13px;">Bars show each feature's SHAP value — how many dollars it added to (teal) or subtracted from (red) the baseline to arrive at the final forecast. Sorted by magnitude.</p>
+  <div id="ex-bars"><div class="loading">Loading…</div></div>
+</div>
+
+<div class="panel section">
+  <h3>Raw contribution table</h3>
+  <div id="ex-table-wrap"><div class="loading">Loading…</div></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function initExplainPage() {
+  const res = await fetch("/api/stores");
+  const stores = await res.json();
+  const select = document.getElementById("ex-store");
+  select.innerHTML = stores.map(s => `<option value="${s.store}">Store ${s.store}</option>`).join("");
+  select.addEventListener("change", loadExplain);
+  loadExplain();
+}
+
+async function loadExplain() {
+  const store = document.getElementById("ex-store").value;
+  document.getElementById("ex-bars").innerHTML = `<div class="loading">Computing SHAP values…</div>`;
+  try {
+    const res = await fetch(`/api/explain?store=${store}`);
+    if (!res.ok) throw new Error("explain request failed");
+    const data = await res.json();
+    renderExplain(data);
+  } catch (e) {
+    document.getElementById("ex-bars").innerHTML = `<div class="error-box">Could not compute an explanation. ${e.message}</div>`;
+  }
+}
+
+function renderExplain(data) {
+  document.getElementById("ex-base").textContent = fmtCurrency(data.base_value);
+  document.getElementById("ex-pred").textContent = fmtCurrency(data.prediction);
+  document.getElementById("ex-date").textContent = data.as_of_date;
+
+  const maxAbs = Math.max(...data.contributions.map(c => Math.abs(c.contribution)), 1);
+
+  const bars = data.contributions.map(c => {
+    const pct = Math.round((Math.abs(c.contribution) / maxAbs) * 100);
+    const positive = c.contribution >= 0;
+    const color = positive ? "var(--teal)" : "var(--red)";
+    const sign = positive ? "+" : "−";
+    return `
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+        <div class="mono" style="width:150px; font-size:12px; color:var(--text-muted); flex-shrink:0;">${c.feature}</div>
+        <div style="flex:1; background:var(--panel-alt); border-radius:2px; height:16px; position:relative;">
+          <div style="width:${pct}%; height:100%; background:${color}; border-radius:2px;"></div>
+        </div>
+        <div class="mono" style="width:110px; text-align:right; font-size:12px; color:${color}; flex-shrink:0;">${sign}${fmtCurrency(Math.abs(c.contribution))}</div>
+      </div>
+    `;
+  }).join("");
+  document.getElementById("ex-bars").innerHTML = bars;
+
+  const rows = data.contributions.map(c => `
+    <tr>
+      <td>${c.feature}</td>
+      <td>${typeof c.value === "number" ? Number(c.value).toLocaleString(undefined, {maximumFractionDigits:2}) : c.value}</td>
+      <td style="color:${c.contribution >= 0 ? 'var(--teal)' : 'var(--red)'}">${c.contribution >= 0 ? "+" : ""}${fmtCurrency(c.contribution)}</td>
+    </tr>
+  `).join("");
+  document.getElementById("ex-table-wrap").innerHTML = `
+    <table>
+      <thead><tr><th>Feature</th><th>Value</th><th>SHAP contribution</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+initExplainPage();
+</script>
+{% endblock %}
